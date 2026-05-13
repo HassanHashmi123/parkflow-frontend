@@ -200,18 +200,6 @@ parkflow-frontend/
 
 ---
 
-## 💼 Business Model
-
-### For Plaza Owners
-- **One-time setup fee:** Rs. 150,000 - 300,000 (depending on plaza size)
-- **Annual maintenance contract (AMC):** Rs. 60,000/year
-- **Optional add-ons:** Camera/ANPR hardware, thermal printer integration
-
-### Revenue Potential (Per Plaza)
-- **2000 shops × Rs. 3,000 monthly fees** = Rs. 60 lakh/month recurring
-- **Daily guest revenue** = Rs. 7-10 lakh/month additional
-- **Total plaza revenue potential:** Rs. 67-70 lakh/month
-
 ---
 
 ## 🌟 Why ParkFlow?
@@ -234,19 +222,6 @@ ParkFlow digitizes the entire workflow:
 - ✅ Multi-role security
 
 ---
-
-## 🗺️ Roadmap
-
-- [x] **Phase 1:** Core check-in/checkout with QR slips
-- [x] **Phase 2A:** Authentication + role-based access
-- [x] **Phase 2B:** Operations pages (active, today, search, reports)
-- [x] **Phase 3A:** Plaza shops + permanent vehicles + monthly payments
-- [x] **Phase 3B:** Admin panel for shops/vehicles/payments
-- [x] **Phase 3C:** Smart operator pages with permanent vs guest detection
-- [ ] **Phase 4:** WhatsApp notifications for monthly reminders
-- [ ] **Phase 5:** Payment gateway integration (JazzCash, EasyPaisa)
-- [ ] **Phase 6:** Production IP camera + boom barrier integration
-- [ ] **Phase 7:** Multi-tenant SaaS (multiple plazas on one platform)
 
 ---
 
