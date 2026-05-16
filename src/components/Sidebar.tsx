@@ -161,11 +161,12 @@ import Link from 'next/link';
 import { motion } from 'framer-motion';
 import {
   LayoutDashboard, LogIn, LogOut, Car, Search,
-  BarChart3, Settings, Users, Tag, Sparkles, Calendar,
+  BarChart3, Settings, Users, Tag, Calendar,
   Store, CarFront, CreditCard
 } from 'lucide-react';
 import { useAuth, canAccess } from '@/lib/auth';
 import { cn } from '@/lib/utils';
+import { BRANDING } from '@/config/branding';
 
 interface NavItem {
   href: string;
@@ -215,10 +216,16 @@ export default function Sidebar() {
             transition={{ duration: 0.6 }}
             className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 via-purple-500 to-pink-500 flex items-center justify-center shadow-md"
           >
-            <Sparkles className="w-5 h-5 text-white" />
+            {BRANDING.app.logo ? (
+              <img src={BRANDING.app.logo} alt={BRANDING.app.name} className="w-6 h-6 object-contain" />
+            ) : (
+              <Store className="w-5 h-5 text-white" />
+            )}
           </motion.div>
-          <div>
-            <p className="font-bold text-lg leading-none gradient-text font-display">ParkFlow</p>
+          <div className="min-w-0">
+            <p className="font-bold text-[13px] leading-tight gradient-text font-display">
+              {BRANDING.app.name}
+            </p>
             <p className="text-[10px] text-slate-400 mt-1 uppercase tracking-wider">v3.0 Plaza</p>
           </div>
         </Link>

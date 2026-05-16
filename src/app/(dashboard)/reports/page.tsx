@@ -9,7 +9,7 @@ import {
 import { BarChart3, TrendingUp, Calendar, Clock, Banknote, Sparkles, Download, Loader2 } from 'lucide-react';
 import CountUp from 'react-countup';
 import { toast } from 'sonner';
-import { reportsApi } from '@/lib/api';
+import { reportsApi , sessionsApi} from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import TopBar from '@/components/TopBar';
 import { StatCardSkeleton } from '@/components/Skeletons';
@@ -50,6 +50,8 @@ export default function ReportsPage() {
     try {
       const jsPDF = (await import('jspdf')).default;
       const html2canvas = (await import('html2canvas')).default;
+
+     
       const autoTable = (await import('jspdf-autotable')).default;
 
       const doc = new jsPDF({ unit: 'pt', format: 'a4' });
@@ -217,6 +219,66 @@ export default function ReportsPage() {
         alternateRowStyles: { fillColor: [248, 250, 252] },
         margin: { left: 40, right: 40 },
       });
+
+ // ===== DETAILED SESSIONS TABLE (with plates) =====
+      if (tab === 'daily') {
+        try {
+          const todaySessions = await sessionsApi.today();
+          if (todaySessions && todaySessions.length > 0) {
+            // Check if we need a new page
+            const currentY = (doc as any).lastAutoTable?.finalY || yPos + 80;
+            if (currentY > pageHeight - 200) {
+              doc.addPage();
+              yPos = 40;
+            } else {
+              yPos = currentY + 20;
+            }
+
+            doc.setTextColor(15, 23, 42);
+            doc.setFontSize(11);
+            doc.setFont('helvetica', 'bold');
+            doc.text("Today's Session Details", 40, yPos);
+            yPos += 10;
+
+            const sessionHeaders = ['Plate', 'Type', 'Owner/Shop', 'In', 'Out', 'Fee'];
+            const sessionData = todaySessions.map((s: any) => [
+              s.plate_number || '—',
+              s.vehicle_type_name || '—',
+              s.session_type === 'permanent' 
+                ? (s.shop_info?.owner_name || s.shop_info?.shop_number || 'Permanent')
+                : 'Guest',
+              s.entry_time ? new Date(s.entry_time).toLocaleTimeString('en-PK', { hour: '2-digit', minute: '2-digit' }) : '—',
+              s.exit_time ? new Date(s.exit_time).toLocaleTimeString('en-PK', { hour: '2-digit', minute: '2-digit' }) : 'Active',
+              s.fee_charged ? `Rs. ${s.fee_charged}` : (s.session_type === 'permanent' ? 'Free' : '—'),
+            ]);
+
+            autoTable(doc, {
+              startY: yPos + 5,
+              head: [sessionHeaders],
+              body: sessionData,
+              theme: 'grid',
+              headStyles: {
+                fillColor: [30, 58, 95],
+                textColor: [212, 160, 23],
+                fontStyle: 'bold',
+                fontSize: 9,
+              },
+              bodyStyles: { fontSize: 8, textColor: [15, 23, 42] },
+              alternateRowStyles: { fillColor: [248, 250, 252] },
+              margin: { left: 40, right: 40 },
+              columnStyles: {
+                0: { fontStyle: 'bold', cellWidth: 70 },
+                5: { fontStyle: 'bold', halign: 'right' },
+              },
+            });
+          }
+        } catch (e) {
+          console.error('Failed to load session details for PDF', e);
+        }
+      }
+
+
+
 
       // ===== FOOTER on each page =====
       const pageCount = (doc as any).internal.getNumberOfPages();

@@ -1,9 +1,10 @@
 import './globals.css';
 import { Toaster } from 'sonner';
+import { BRANDING } from '@/config/branding';
 
 export const metadata = {
-  title: 'ParkFlow — Parking Management',
-  description: 'Modern parking management system',
+  title: `${BRANDING.app.name} - Parking Management`,
+  description: BRANDING.app.tagline,
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

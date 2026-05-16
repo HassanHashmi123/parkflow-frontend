@@ -53,8 +53,8 @@ export default function VehicleTypesAdminPage() {
 
   const loadData = async () => {
     try {
-      // active_only=false to show all (including deactivated)
-      const data = await vehicleTypesApi.list();
+      // Show active and inactive types so admins can reactivate a deactivated type.
+      const data = await vehicleTypesApi.list(false);
       setTypes(data);
     } catch (e) {
       console.error(e);
@@ -139,7 +139,7 @@ export default function VehicleTypesAdminPage() {
     setActionLoading(true);
     try {
       await vehicleTypesApi.delete(confirmDelete.id);
-      toast.success(`${confirmDelete.name} removed`);
+      toast.success(`${confirmDelete.name} deleted`);
       setConfirmDelete(null);
       await loadData();
     } catch (err: any) {
@@ -487,9 +487,9 @@ export default function VehicleTypesAdminPage() {
       {/* Delete confirm */}
       <ConfirmModal
         open={!!confirmDelete}
-        title={`Remove ${confirmDelete?.name}?`}
-        message="This will deactivate the vehicle type. Existing parking sessions remain unaffected."
-        confirmLabel="Remove"
+        title={`Delete ${confirmDelete?.name}?`}
+        message="This will permanently delete this vehicle type if it is not used in sessions or permanent vehicles. Used types should be deactivated instead."
+        confirmLabel="Delete"
         variant="danger"
         loading={actionLoading}
         onConfirm={handleDelete}

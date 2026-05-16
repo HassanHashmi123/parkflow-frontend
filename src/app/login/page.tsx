@@ -3,10 +3,11 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Lock, User, Eye, EyeOff, Sparkles, ArrowRight, Loader2 } from 'lucide-react';
+import { Lock, User, Eye, EyeOff, Store, ArrowRight, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { authApi } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
+import { BRANDING } from '@/config/branding';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -99,7 +100,11 @@ export default function LoginPage() {
                 animate={{ rotate: [0, 5, -5, 0] }}
                 transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
               >
-                <Sparkles className="w-10 h-10 text-white" />
+                {BRANDING.app.logo ? (
+                  <img src={BRANDING.app.logo} alt={BRANDING.app.name} className="w-12 h-12 object-contain" />
+                ) : (
+                  <Store className="w-10 h-10 text-white" />
+                )}
               </motion.div>
               <motion.div
                 className="absolute -inset-2 rounded-2xl bg-gradient-to-br from-blue-400 to-purple-400 opacity-30 blur-xl -z-10"
@@ -107,10 +112,10 @@ export default function LoginPage() {
                 transition={{ duration: 3, repeat: Infinity }}
               />
             </div>
-            <h1 className="mt-5 text-3xl font-bold font-display tracking-tight">
-              <span className="gradient-text">ParkFlow</span>
+            <h1 className="mt-5 text-2xl sm:text-3xl font-bold font-display tracking-tight text-center leading-tight">
+              <span className="gradient-text">{BRANDING.app.name}</span>
             </h1>
-            <p className="text-slate-500 text-sm mt-1">Smart parking, simplified</p>
+            <p className="text-slate-500 text-sm mt-1">{BRANDING.app.tagline}</p>
           </motion.div>
 
           {/* Form */}
@@ -223,7 +228,7 @@ export default function LoginPage() {
           transition={{ delay: 0.9 }}
           className="text-center text-xs text-slate-500 mt-6"
         >
-          ParkFlow v2.0 · Built with care
+          {BRANDING.app.name} {BRANDING.app.version}
         </motion.p>
       </motion.div>
     </div>
