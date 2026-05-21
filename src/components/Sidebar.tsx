@@ -162,7 +162,7 @@ import { motion } from 'framer-motion';
 import {
   LayoutDashboard, LogIn, LogOut, Car, Search,
   BarChart3, Settings, Users, Tag, Calendar,
-  Store, CarFront, CreditCard
+  Store, CarFront, CreditCard, History, Receipt
 } from 'lucide-react';
 import { useAuth, canAccess } from '@/lib/auth';
 import { cn } from '@/lib/utils';
@@ -183,6 +183,8 @@ const navItems: NavItem[] = [
   { href: '/today', label: "Today's Sessions", icon: Calendar, roles: ['admin', 'operator', 'viewer'] },
   { href: '/search', label: 'Search', icon: Search, roles: ['admin', 'operator', 'viewer'] },
   { href: '/reports', label: 'Reports', icon: BarChart3, roles: ['admin', 'operator', 'viewer'] },
+  { href: '/history', label: 'History', icon: History, roles: ['admin', 'operator', 'viewer'] },
+  { href: '/daily-slip', label: 'Daily Slip', icon: Receipt, roles: ['admin', 'operator'] },
 ];
 
 const adminItems: NavItem[] = [

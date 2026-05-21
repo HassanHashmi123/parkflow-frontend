@@ -2,7 +2,8 @@
 
 import { useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Printer, Download } from 'lucide-react';
+import { X, Printer } from 'lucide-react';
+import { QRCodeCanvas } from 'qrcode.react';
 import { BRANDING } from '@/config/branding';
 
 interface SlipData {
@@ -26,8 +27,9 @@ interface ParkingSlipProps {
 
 export default function ParkingSlip({ data, onClose, onNewCheckin }: ParkingSlipProps) {
   const slipRef = useRef<HTMLDivElement>(null);
-  const qrRef = useRef<HTMLCanvasElement>(null);
   const price = data.flat_rate || data.rate || data.fee || data.fee_charged || 0;
+  // QR code contains just the token — scanner reads this for instant checkout
+  const qrValue = data.token;
   
 
   
@@ -39,63 +41,11 @@ export default function ParkingSlip({ data, onClose, onNewCheckin }: ParkingSlip
   const h12 = hours % 12 || 12;
   const timeStr = `${h12}:${String(now.getMinutes()).padStart(2, '0')} ${ampm}`;
 
-  // Generate QR code
-  useEffect(() => {
-    if (!qrRef.current || !BRANDING.slip.showQR) return;
-
-    const qrData = data.qr_data || JSON.stringify({
-      token: data.token,
-      plate: data.plate_number,
-      time: data.entry_time,
-      plaza: BRANDING.plaza.shortName,
-    });
-
-    // Simple QR-like pattern (for demo — use qrcode library in production)
-    const canvas = qrRef.current;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    const size = 120;
-    canvas.width = size;
-    canvas.height = size;
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, size, size);
-    ctx.fillStyle = '#000000';
-
-    // Generate deterministic pattern from token
-    const seed = data.token.split('').reduce((a, c) => a + c.charCodeAt(0), 0);
-    const modules = 21;
-    const cellSize = Math.floor(size / modules);
-    const offset = Math.floor((size - cellSize * modules) / 2);
-
-    for (let row = 0; row < modules; row++) {
-      for (let col = 0; col < modules; col++) {
-        // Corner finder patterns (3 corners)
-        const isFinderTL = row < 7 && col < 7;
-        const isFinderTR = row < 7 && col >= modules - 7;
-        const isFinderBL = row >= modules - 7 && col < 7;
-
-        if (isFinderTL || isFinderTR || isFinderBL) {
-          const localR = isFinderTL ? row : isFinderTR ? row : row - (modules - 7);
-          const localC = isFinderTL ? col : isFinderTR ? col - (modules - 7) : col;
-          const isBorder = localR === 0 || localR === 6 || localC === 0 || localC === 6;
-          const isInner = localR >= 2 && localR <= 4 && localC >= 2 && localC <= 4;
-          if (isBorder || isInner) {
-            ctx.fillRect(offset + col * cellSize, offset + row * cellSize, cellSize, cellSize);
-          }
-        } else {
-          // Data area — use seeded pseudo-random
-          const hash = ((seed * (row * modules + col + 1)) % 997) / 997;
-          if (hash > 0.5) {
-            ctx.fillRect(offset + col * cellSize, offset + row * cellSize, cellSize, cellSize);
-          }
-        }
-      }
-    }
-  }, [data]);
 
   const handlePrint = () => {
-    
+    // Get QR as base64 image from rendered canvas
+    const qrCanvas = document.querySelector('#slip-qr-canvas canvas') as HTMLCanvasElement;
+    const qrDataUrl = qrCanvas ? qrCanvas.toDataURL('image/png') : '';
     const printWindow = window.open('', '_blank', 'width=250,height=500');
     
     if (!printWindow) return;
@@ -155,9 +105,12 @@ export default function ParkingSlip({ data, onClose, onNewCheckin }: ParkingSlip
           <div class="center plate">${data.plate_number}</div>
           <div class="center fee">Rs. ${price}</div>
           
-          ${BRANDING.slip.showQR ? `
+          ${BRANDING.slip.showQR && qrDataUrl ? `
             <div class="divider"></div>
-            <canvas class="qr" id="printQR" width="120" height="120"></canvas>
+            <div class="center">
+              <img src="${qrDataUrl}" width="100" height="100" class="qr" />
+              <div style="font-size:8px;color:#888;margin-top:1mm;">${data.token}</div>
+            </div>
           ` : ''}
           
           <div class="divider"></div>
@@ -165,26 +118,7 @@ export default function ParkingSlip({ data, onClose, onNewCheckin }: ParkingSlip
           <div class="center footer">${BRANDING.slip.footer.replace('\n', '<br>')}</div>
         </div>
 
-        <script>
-          ${BRANDING.slip.showQR ? `
-            // Copy QR to print window
-            const canvas = document.getElementById('printQR');
-            const ctx = canvas.getContext('2d');
-            const size = 120, modules = 21, cellSize = Math.floor(size/modules);
-            const offset = Math.floor((size - cellSize*modules)/2);
-            const seed = "${data.token}".split('').reduce((a,c) => a + c.charCodeAt(0), 0);
-            ctx.fillStyle='#fff'; ctx.fillRect(0,0,size,size); ctx.fillStyle='#000';
-            for(let r=0;r<modules;r++) for(let c=0;c<modules;c++) {
-              const tl=r<7&&c<7, tr=r<7&&c>=modules-7, bl=r>=modules-7&&c<7;
-              if(tl||tr||bl){const lr=tl?r:tr?r:r-(modules-7),lc=tl?c:tr?c-(modules-7):c;
-              if(lr===0||lr===6||lc===0||lc===6||(lr>=2&&lr<=4&&lc>=2&&lc<=4))
-              ctx.fillRect(offset+c*cellSize,offset+r*cellSize,cellSize,cellSize);}
-              else{if(((seed*(r*modules+c+1))%997)/997>0.5)
-              ctx.fillRect(offset+c*cellSize,offset+r*cellSize,cellSize,cellSize);}
-            }
-          ` : ''}
-          setTimeout(() => { window.print(); window.close(); }, 300);
-        </script>
+        <script>setTimeout(() => { window.print(); window.close(); }, 300);</script>
       </body>
       </html>
     `);
@@ -261,16 +195,18 @@ export default function ParkingSlip({ data, onClose, onNewCheckin }: ParkingSlip
               </p>
             </div>
 
-            {/* QR Code */}
+            {/* QR Code — real, scannable */}
             {BRANDING.slip.showQR && (
               <>
                 <div className="border-t border-dashed border-slate-300 my-3" />
-                <div className="flex justify-center">
-                  <canvas
-                    ref={qrRef}
-                    className="border border-slate-200 rounded-lg"
-                    style={{ width: 100, height: 100 }}
+                <div id="slip-qr-canvas" className="flex flex-col items-center gap-1">
+                  <QRCodeCanvas
+                    value={qrValue}
+                    size={110}
+                    level="M"
+                    className="border border-slate-200 rounded-lg p-1"
                   />
+                  <p className="text-[9px] text-slate-400 font-mono">{data.token}</p>
                 </div>
               </>
             )}

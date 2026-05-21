@@ -14,6 +14,20 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+// On 401 — token expired or invalid → clear auth and redirect to login
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401 && typeof window !== 'undefined') {
+      localStorage.removeItem('parkflow_token');
+      localStorage.removeItem('parkflow_user');
+      localStorage.removeItem('parkflow-auth');
+      window.location.href = '/login';
+    }
+    return Promise.reject(error);
+  }
+);
+
 // ============= Auth =============
 export const authApi = {
   login: async (username: string, password: string) => {
@@ -114,6 +128,30 @@ export const reportsApi = {
     const { data } = await api.get('/reports/by-vehicle-type', { params: { from_date, to_date } });
     return data;
   },
+  history: async (params: {
+    period: 'hourly' | 'daily' | 'weekly' | 'monthly';
+    from_date?: string;
+    to_date?: string;
+    target_date?: string;
+    year?: number;
+  }) => {
+    const { data } = await api.get('/reports/history', { params });
+    return data;
+  },
+  dailySlip: async (slip_date: string) => {
+    const { data } = await api.get(`/reports/daily-slip/${slip_date}`);
+    return data;
+  },
+  closeDay: async (target_date?: string, notes?: string) => {
+    const { data } = await api.post('/reports/close-day', null, {
+      params: { target_date, notes },
+    });
+    return data;
+  },
+  snapshots: async (limit?: number) => {
+    const { data } = await api.get('/reports/snapshots', { params: { limit } });
+    return data;
+  },
 };
 
 // ============= Users (Admin) =============
@@ -140,8 +178,12 @@ export const usersApi = {
 
 // ============= Shops (Phase 3A) =============
 export const shopsApi = {
-  list: async (params?: { search?: string; block?: string; floor?: string; is_active?: boolean; skip?: number; limit?: number }) => {
+  list: async (params?: { search?: string; block?: string; floor?: string; plaza_name?: string; is_active?: boolean; skip?: number; limit?: number }) => {
     const { data } = await api.get('/shops', { params });
+    return data;
+  },
+  plazas: async (): Promise<string[]> => {
+    const { data } = await api.get('/shops/plazas');
     return data;
   },
   get: async (id: number) => {
@@ -169,6 +211,10 @@ export const shopsApi = {
     const { data } = await api.post('/shops/bulk-upload', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
+    return data;
+  },
+  resetAll: async () => {
+    const { data } = await api.delete('/shops/reset-all');
     return data;
   },
 };
@@ -200,6 +246,10 @@ export const permanentVehiclesApi = {
     const { data } = await api.post('/permanent-vehicles/bulk-upload', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
+    return data;
+  },
+  resetAll: async () => {
+    const { data } = await api.delete('/permanent-vehicles/reset-all');
     return data;
   },
 };
