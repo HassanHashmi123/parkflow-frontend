@@ -377,13 +377,14 @@ export default function PermanentVehiclesPage() {
         try {
           const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
           JsBarcode(svg, String(v.plate_number), {
-            format: 'CODE128', width: 1.2, height: 40, displayValue: true, fontSize: 11, margin: 2,
+            format: 'CODE128', width: 1.2, height: 40,
+            displayValue: true, text: v.owner_phone || '', fontSize: 11, margin: 2,
           });
           svgHtml = svg.outerHTML;
         } catch {
           svgHtml = `<div style="height:40px;line-height:40px;font-size:8px;color:red">ERR</div>`;
         }
-        return `<div class="card">${svgHtml}<div class="phone">${v.owner_phone || '—'}</div></div>`;
+        return `<div class="card">${svgHtml}</div>`;
       }).join('');
 
       const win = window.open('', '_blank');
