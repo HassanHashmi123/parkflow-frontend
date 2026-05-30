@@ -377,13 +377,13 @@ export default function PermanentVehiclesPage() {
         try {
           const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
           JsBarcode(svg, String(v.plate_number), {
-            format: 'CODE128', width: 1.5, height: 40, displayValue: false, margin: 2,
+            format: 'CODE128', width: 1.2, height: 40, displayValue: false, margin: 2,
           });
           svgHtml = svg.outerHTML;
         } catch {
           svgHtml = `<div style="height:40px;line-height:40px;font-size:8px;color:red">ERR</div>`;
         }
-        return `<div class="card">${svgHtml}<div class="plate">${v.plate_number}</div><div class="phone">${v.owner_phone || '—'}</div></div>`;
+        return `<div class="card">${svgHtml}<div class="phone">${v.owner_phone || '—'}</div></div>`;
       }).join('');
 
       const win = window.open('', '_blank');
@@ -395,11 +395,10 @@ export default function PermanentVehiclesPage() {
         .bar{padding:10px;background:#4f46e5;display:flex;gap:12px;align-items:center}
         .bar button{padding:8px 18px;background:#fff;color:#4f46e5;border:none;border-radius:6px;font-weight:bold;cursor:pointer;font-size:14px}
         .bar span{color:#fff;font-size:13px}
-        .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:4mm;padding:4mm}
+        .grid{display:grid;grid-template-columns:repeat(5,1fr);gap:3mm;padding:4mm}
         .card{border:1px solid #bbb;padding:2mm;text-align:center;break-inside:avoid}
         .card svg{width:100%;height:auto;display:block}
-        .plate{font-weight:bold;font-size:9pt;margin:1mm 0;font-family:monospace}
-        .phone{font-size:8pt;color:#555}
+        .phone{font-size:8pt;color:#555;margin-top:1mm}
         @media print{.bar{display:none}}
       </style></head><body>
         <div class="bar">
