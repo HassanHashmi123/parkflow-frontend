@@ -352,9 +352,17 @@ export default function PermanentVehiclesPage() {
   const generateBarcodesPDF = async () => {
     setGeneratingPDF(true);
     try {
-      // fetch without is_active filter — filter client side
-      const raw = await permanentVehiclesApi.list({ limit: 2000 });
-      const list: any[] = (Array.isArray(raw) ? raw : []).filter((v: any) => v.is_active !== false);
+      // paginate to fetch all vehicles regardless of backend limit
+      const list: any[] = [];
+      let skip = 0;
+      const batchSize = 500;
+      while (true) {
+        const batch = await permanentVehiclesApi.list({ limit: batchSize, skip });
+        if (!Array.isArray(batch) || batch.length === 0) break;
+        list.push(...batch.filter((v: any) => v.is_active !== false));
+        if (batch.length < batchSize) break;
+        skip += batchSize;
+      }
 
       if (list.length === 0) {
         toast.error('No vehicles found');
