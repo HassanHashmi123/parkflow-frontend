@@ -14,6 +14,7 @@ import { useRouter } from 'next/navigation';
 import { formatTime, getDuration } from '@/lib/utils';
 import TopBar from '@/components/TopBar';
 import Confetti from '@/components/Confetti';
+import ScannerBadge, { BadgeData } from '@/components/ScannerBadge';
 
 export default function CheckoutPage() {
   const router = useRouter();
@@ -27,6 +28,7 @@ export default function CheckoutPage() {
   const [result, setResult] = useState<any>(null);
   const [showConfetti, setShowConfetti] = useState(false);
   const [filteredSessions, setFilteredSessions] = useState<any[]>([]);
+  const [badge, setBadge] = useState<BadgeData | null>(null);
 
   const normalizeScanValue = (value: string) =>
     value
@@ -107,11 +109,58 @@ export default function CheckoutPage() {
     }
   }, []);
 
+  // Permanent vehicle card checkout (plate-based, shows floating badge instead of modal)
+  const processCardCheckout = useCallback(async (plate: string) => {
+    setLoading(true);
+    try {
+      const data = await sessionsApi.checkout({ plate_number: plate });
+      const isPermanent = data.is_permanent || data.session?.session_type === 'permanent';
+      if (isPermanent) {
+        const shopInfo = data.session?.shop_info || data.shop_info;
+        setBadge({
+          mode: 'checkout',
+          plate,
+          shopNumber: shopInfo?.shop_number,
+          shopName: shopInfo?.shop_name,
+          ownerName: shopInfo?.owner_name,
+        });
+      } else {
+        // Guest checkout via plate → show normal result modal
+        setResult({
+          ...data,
+          plate_number: plate,
+          vehicle_type_name: data.session?.vehicle_type_name || '',
+          entry_time: data.session?.entry_time || '',
+          exit_time: data.session?.exit_time || new Date().toISOString(),
+          token: data.session?.token || '',
+          is_permanent: false,
+        });
+        setShowConfetti(true);
+        setTimeout(() => setShowConfetti(false), 2500);
+        toast.success(`Checkout! Fee: Rs. ${data.fee || 0}`);
+      }
+      await loadActive();
+    } catch (err: any) {
+      setBadge({ mode: 'checkout', plate, error: err.response?.data?.detail || 'Checkout failed' });
+    } finally {
+      setLoading(false);
+    }
+  }, [loadActive]);
+
   // Called by barcode scanner (Enter key after token typed) or manual token entry
   const checkoutByToken = useCallback(async (rawToken: string) => {
     const token = normalizeScanValue(rawToken);
     if (!token) return;
     setSearchValue('');
+
+    // Detect if scanned value is a plate number (not a PF- token)
+    // Token format: PF-YYYYMMDD-XXXX or 4-digit suffix
+    const isToken = token.startsWith('PF-') || /^\d{1,6}$/.test(token);
+    if (!isToken && token.length >= 3) {
+      // Treat as shopkeeper card (plate number) → card checkout
+      await processCardCheckout(token);
+      return;
+    }
 
     // First try local active sessions list for instant match
     const session = activeSessions.find((s) => {
@@ -128,22 +177,29 @@ export default function CheckoutPage() {
     try {
       const data = await sessionsApi.checkout({ token });
       const isPermanent = data.is_permanent || data.session?.session_type === 'permanent';
-      setResult({
-        ...data,
-        plate_number: data.session?.plate_number || '',
-        vehicle_type_name: data.session?.vehicle_type_name || '',
-        entry_time: data.session?.entry_time || '',
-        exit_time: data.session?.exit_time || new Date().toISOString(),
-        token: data.session?.token || token,
-        is_permanent: isPermanent,
-        shop_info: data.session?.shop_info || null,
-      });
-      if (!isPermanent) {
+      if (isPermanent) {
+        const shopInfo = data.session?.shop_info || data.shop_info;
+        setBadge({
+          mode: 'checkout',
+          plate: data.session?.plate_number || token,
+          shopNumber: shopInfo?.shop_number,
+          shopName: shopInfo?.shop_name,
+          ownerName: shopInfo?.owner_name,
+        });
+      } else {
+        setResult({
+          ...data,
+          plate_number: data.session?.plate_number || '',
+          vehicle_type_name: data.session?.vehicle_type_name || '',
+          entry_time: data.session?.entry_time || '',
+          exit_time: data.session?.exit_time || new Date().toISOString(),
+          token: data.session?.token || token,
+          is_permanent: false,
+          shop_info: null,
+        });
         setShowConfetti(true);
         setTimeout(() => setShowConfetti(false), 2500);
         toast.success(`Checkout! Fee: Rs. ${data.fee || 0}`);
-      } else {
-        toast.success('Permanent vehicle exit logged');
       }
       await loadActive();
     } catch (err: any) {
@@ -151,7 +207,7 @@ export default function CheckoutPage() {
     } finally {
       setLoading(false);
     }
-  }, [activeSessions, handleCheckout]);
+  }, [activeSessions, handleCheckout, processCardCheckout]);
 
   // Enter key handler — barcode scanner sends Enter after barcode string
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -305,6 +361,9 @@ export default function CheckoutPage() {
           </AnimatePresence>
         </div>
       )}
+
+      {/* Floating card scanner badge */}
+      <ScannerBadge data={badge} onDismiss={() => setBadge(null)} />
 
       {/* Result Modal */}
       <AnimatePresence>
