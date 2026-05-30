@@ -260,7 +260,16 @@ export const monthlyPaymentsApi = {
     const { data } = await api.get('/monthly-payments', { params });
     return data;
   },
-  create: async (payload: { shop_id: number; month: string; amount: number; payment_method?: string; receipt_number?: string; notes?: string }) => {
+  create: async (payload: {
+    shop_id: number;
+    month: string;
+    amount: number;
+    payment_method?: string;
+    receipt_number?: string;
+    notes?: string;
+    billing_start?: string;
+    billing_end?: string;
+  }) => {
     const { data } = await api.post('/monthly-payments', payload);
     return data;
   },
@@ -275,6 +284,10 @@ export const monthlyPaymentsApi = {
   summary: async (month: string) => {
     const { data } = await api.get(`/monthly-payments/summary/${month}`);
     return data;
+  },
+  reminders: async () => {
+    const { data } = await api.get('/monthly-payments/reminders');
+    return data as { today: string; count: number; reminders: any[] };
   },
 };
 

@@ -62,15 +62,16 @@ export default function DailySlipPage() {
 <head>
   <meta charset="UTF-8">
   <style>
-    @page { size: 58mm auto; margin: 0; }
+    @page { size: 80mm auto; margin: 0; }
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
       font-family: 'Courier New', monospace;
-      font-size: 10px;
+      font-size: 11px;
+      font-weight: bold;
       line-height: 1.5;
       color: #000;
       background: #fff;
-      width: 56mm;
+      width: 76mm;
       padding: 2mm;
     }
     table { width: 100%; border-collapse: collapse; }
@@ -102,7 +103,7 @@ export default function DailySlipPage() {
       <style>{`
         @media print {
           @page {
-            size: 58mm auto;
+            size: 80mm auto;
             margin: 0mm;
           }
           body * { visibility: hidden !important; }
@@ -111,7 +112,7 @@ export default function DailySlipPage() {
             position: fixed !important;
             left: 0mm !important;
             top: 0mm !important;
-            width: 56mm !important;
+            width: 76mm !important;
             margin: 0 !important;
             padding: 1mm 2mm !important;
             font-size: 10px !important;
@@ -278,11 +279,12 @@ function ThermalSlip({ data, slipRef }: { data: any; slipRef: React.RefObject<HT
       id="thermal-slip"
       ref={slipRef}
       style={{
-        width: '56mm',
+        width: '76mm',
         fontFamily: "'Courier New', Courier, monospace",
-        fontSize: '10px',
+        fontSize: '11px',
         lineHeight: '1.5',
         color: '#000',
+        fontWeight: 'bold',
         backgroundColor: '#fff',
         padding: '2mm',
       }}
@@ -290,7 +292,7 @@ function ThermalSlip({ data, slipRef }: { data: any; slipRef: React.RefObject<HT
       {/* Header */}
       <div style={{ textAlign: 'center', marginBottom: '3px' }}>
         <div style={{ fontWeight: 'bold', fontSize: '11px' }}>{BRANDING.plaza.name}</div>
-        <div style={{ fontSize: '9px' }}>{BRANDING.plaza.address}</div>
+        <div style={{ fontSize: '9px', fontWeight: 'bold', color: '#000' }}>{BRANDING.plaza.address}</div>
         <div style={{ fontWeight: 'bold', marginTop: '2px', fontSize: '11px' }}>Daily Revenue Slip</div>
       </div>
 
@@ -317,7 +319,7 @@ function ThermalSlip({ data, slipRef }: { data: any; slipRef: React.RefObject<HT
       <hr style={{ border: 'none', borderTop: '1px dashed #000', margin: '3px 0' }} />
 
       {/* Rows */}
-      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '10px' }}>
+      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '10px', fontWeight: 'bold', color: '#000' }}>
         <tbody>
           {data.parking_monthly?.revenue > 0 && (
             <tr>
@@ -335,7 +337,7 @@ function ThermalSlip({ data, slipRef }: { data: any; slipRef: React.RefObject<HT
           ))}
           {data.vehicle_items?.length === 0 && !data.parking_monthly?.revenue && (
             <tr>
-              <td colSpan={3} style={{ textAlign: 'center', color: '#666', padding: '4px 0' }}>
+              <td colSpan={3} style={{ textAlign: 'center', color: '#000', padding: '4px 0' }}>
                 No transactions
               </td>
             </tr>
@@ -358,7 +360,7 @@ function ThermalSlip({ data, slipRef }: { data: any; slipRef: React.RefObject<HT
       <hr style={{ border: 'none', borderTop: '1px solid #000', margin: '3px 0' }} />
 
       {/* Footer */}
-      <div style={{ textAlign: 'center', marginTop: '3px', fontSize: '9px' }}>
+      <div style={{ textAlign: 'center', marginTop: '3px', fontSize: '9px', fontWeight: 'bold', color: '#000' }}>
         <div>{dateTimeStr}</div>
         <div>Thank You</div>
       </div>

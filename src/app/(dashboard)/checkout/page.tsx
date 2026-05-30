@@ -3,8 +3,8 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Search, LogOut, Loader2, CheckCircle2, Clock, Car, Banknote,
-  Sparkles, X, Store, QrCode, Camera, CameraOff
+  LogOut, Loader2, CheckCircle2, Clock, Car, Banknote,
+  Sparkles, X, Store, ScanLine, Search
 } from 'lucide-react';
 import CountUp from 'react-countup';
 import { toast } from 'sonner';
@@ -19,18 +19,20 @@ export default function CheckoutPage() {
   const router = useRouter();
   const { user } = useAuth();
   const scannerInputRef = useRef<HTMLInputElement>(null);
-  const html5QrRef = useRef<any>(null);
-  const scannerDivId = 'qr-camera-scanner';
 
-  const [searchType, setSearchType] = useState<'plate' | 'token'>('token');
+  const [searchType, setSearchType] = useState<'token' | 'plate'>('token');
   const [searchValue, setSearchValue] = useState('');
   const [activeSessions, setActiveSessions] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
   const [showConfetti, setShowConfetti] = useState(false);
   const [filteredSessions, setFilteredSessions] = useState<any[]>([]);
-  const [cameraOpen, setCameraOpen] = useState(false);
-  const [cameraLoading, setCameraLoading] = useState(false);
+
+  const normalizeScanValue = (value: string) =>
+    value
+      .trim()
+      .toUpperCase()
+      .replace(/[^A-Z0-9-]/g, '');
 
   useEffect(() => {
     if (!canAccess(user?.role, ['admin', 'operator'])) router.replace('/');
@@ -44,9 +46,10 @@ export default function CheckoutPage() {
 
   useEffect(() => { loadActive(); }, []);
 
+  // Filter active sessions list as user types
   useEffect(() => {
     if (!searchValue) { setFilteredSessions(activeSessions); return; }
-    const v = searchValue.toUpperCase().replace(/\s/g, '');
+    const v = normalizeScanValue(searchValue);
     setFilteredSessions(
       activeSessions.filter((s) =>
         searchType === 'plate' ? s.plate_number.includes(v) : s.token.includes(v)
@@ -54,12 +57,24 @@ export default function CheckoutPage() {
     );
   }, [searchValue, activeSessions, searchType]);
 
-  // Auto-focus scanner input when camera is closed
+  // Keep scanner input focused at all times (unless result modal is open)
   useEffect(() => {
-    if (!cameraOpen) {
-      setTimeout(() => scannerInputRef.current?.focus(), 100);
+    if (!result) {
+      setTimeout(() => scannerInputRef.current?.focus(), 150);
     }
-  }, [cameraOpen]);
+  }, [result]);
+
+  // Global keydown — redirect any keypress to scanner input when not in modal
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (result) return;
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+      scannerInputRef.current?.focus();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [result]);
 
   const handleCheckout = useCallback(async (session: any) => {
     setLoading(true);
@@ -81,7 +96,7 @@ export default function CheckoutPage() {
         setTimeout(() => setShowConfetti(false), 2500);
         toast.success(`Checkout! Fee: Rs. ${data.fee || 0}`);
       } else {
-        toast.success(`Permanent vehicle exit logged`);
+        toast.success('Permanent vehicle exit logged');
       }
       setSearchValue('');
       await loadActive();
@@ -92,49 +107,54 @@ export default function CheckoutPage() {
     }
   }, []);
 
-  // Auto-checkout by token (USB scanner or camera)
+  // Called by barcode scanner (Enter key after token typed) or manual token entry
   const checkoutByToken = useCallback(async (rawToken: string) => {
-    const token = rawToken.trim().toUpperCase();
+    const token = normalizeScanValue(rawToken);
     if (!token) return;
+    setSearchValue('');
 
-    const session = activeSessions.find((s) => s.token === token);
+    // First try local active sessions list for instant match
+    const session = activeSessions.find((s) => {
+      const suffix = s.token.split('-').pop();
+      return s.token === token || suffix === token;
+    });
     if (session) {
       await handleCheckout(session);
-    } else {
-      // Try checkout by token directly via API
-      setLoading(true);
-      try {
-        const data = await sessionsApi.checkout({ token });
-        const isPermanent = data.is_permanent || data.session?.session_type === 'permanent';
-        setResult({
-          ...data,
-          plate_number: data.session?.plate_number || '',
-          vehicle_type_name: data.session?.vehicle_type_name || '',
-          entry_time: data.session?.entry_time || '',
-          exit_time: data.session?.exit_time || new Date().toISOString(),
-          token: data.session?.token || token,
-          is_permanent: isPermanent,
-          shop_info: data.session?.shop_info || null,
-        });
-        if (!isPermanent) {
-          setShowConfetti(true);
-          setTimeout(() => setShowConfetti(false), 2500);
-          toast.success(`Checkout! Fee: Rs. ${data.fee || 0}`);
-        } else {
-          toast.success('Permanent vehicle exit logged');
-        }
-        setSearchValue('');
-        await loadActive();
-      } catch (err: any) {
-        toast.error(err.response?.data?.detail || `Token not found: ${token}`);
-      } finally {
-        setLoading(false);
+      return;
+    }
+
+    // Fallback: call API directly with token
+    setLoading(true);
+    try {
+      const data = await sessionsApi.checkout({ token });
+      const isPermanent = data.is_permanent || data.session?.session_type === 'permanent';
+      setResult({
+        ...data,
+        plate_number: data.session?.plate_number || '',
+        vehicle_type_name: data.session?.vehicle_type_name || '',
+        entry_time: data.session?.entry_time || '',
+        exit_time: data.session?.exit_time || new Date().toISOString(),
+        token: data.session?.token || token,
+        is_permanent: isPermanent,
+        shop_info: data.session?.shop_info || null,
+      });
+      if (!isPermanent) {
+        setShowConfetti(true);
+        setTimeout(() => setShowConfetti(false), 2500);
+        toast.success(`Checkout! Fee: Rs. ${data.fee || 0}`);
+      } else {
+        toast.success('Permanent vehicle exit logged');
       }
+      await loadActive();
+    } catch (err: any) {
+      toast.error(err.response?.data?.detail || `Token not found: ${token}`);
+    } finally {
+      setLoading(false);
     }
   }, [activeSessions, handleCheckout]);
 
-  // USB/Bluetooth scanner — detects Enter key in token input
-  const handleScannerKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+  // Enter key handler — barcode scanner sends Enter after barcode string
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && searchValue.trim()) {
       e.preventDefault();
       if (searchType === 'token') {
@@ -143,48 +163,11 @@ export default function CheckoutPage() {
     }
   };
 
-  // Camera QR scanner
-  const openCamera = async () => {
-    setCameraOpen(true);
-    setCameraLoading(true);
-    try {
-      const { Html5Qrcode } = await import('html5-qrcode');
-      const scanner = new Html5Qrcode(scannerDivId);
-      html5QrRef.current = scanner;
-      await scanner.start(
-        { facingMode: 'environment' },
-        { fps: 10, qrbox: { width: 250, height: 250 } },
-        async (decodedText: string) => {
-          // Token scanned successfully
-          await scanner.stop();
-          html5QrRef.current = null;
-          setCameraOpen(false);
-          toast.success(`QR Scanned: ${decodedText}`);
-          await checkoutByToken(decodedText);
-        },
-        () => {} // ignore scan errors
-      );
-    } catch (err: any) {
-      toast.error('Camera open nahi ho saka. Permission check karo.');
-      setCameraOpen(false);
-    } finally {
-      setCameraLoading(false);
-    }
-  };
-
-  const closeCamera = async () => {
-    if (html5QrRef.current) {
-      try { await html5QrRef.current.stop(); } catch {}
-      html5QrRef.current = null;
-    }
-    setCameraOpen(false);
-  };
-
   const closeReceipt = () => {
     setResult(null);
     setShowConfetti(false);
     setSearchValue('');
-    setTimeout(() => scannerInputRef.current?.focus(), 100);
+    setTimeout(() => scannerInputRef.current?.focus(), 150);
   };
 
   return (
@@ -201,7 +184,7 @@ export default function CheckoutPage() {
             <span className="text-xs font-bold text-amber-600 uppercase tracking-wider">Smart Vehicle Exit</span>
           </div>
           <h2 className="text-2xl sm:text-3xl font-bold text-slate-800">Vehicle <span className="gradient-text">Check-Out</span></h2>
-          <p className="text-slate-500 text-sm mt-1">Scan ticket QR · USB scanner · Manual search</p>
+          <p className="text-slate-500 text-sm mt-1">Barcode scanner (SC-1205) · Manual plate search</p>
         </div>
       </motion.div>
 
@@ -210,75 +193,60 @@ export default function CheckoutPage() {
 
         {/* Mode tabs */}
         <div className="flex gap-2 mb-4">
-          <button onClick={() => setSearchType('token')} className={`flex-1 py-2.5 rounded-xl text-sm font-semibold transition flex items-center justify-center gap-1.5 ${searchType === 'token' ? 'bg-gradient-to-r from-blue-500 to-purple-500 text-white shadow-md' : 'bg-slate-100 text-slate-600'}`}>
-            <QrCode className="w-4 h-4" /> By Token / QR
-          </button>
-          <button onClick={() => setSearchType('plate')} className={`flex-1 py-2.5 rounded-xl text-sm font-semibold transition flex items-center justify-center gap-1.5 ${searchType === 'plate' ? 'bg-gradient-to-r from-blue-500 to-purple-500 text-white shadow-md' : 'bg-slate-100 text-slate-600'}`}>
-            <Car className="w-4 h-4" /> By Plate
-          </button>
-        </div>
-
-        {/* Scanner input + Camera button */}
-        <div className="flex gap-2">
-          <div className="relative flex-1">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-            <input
-              ref={scannerInputRef}
-              type="text"
-              value={searchValue}
-              onChange={(e) => setSearchValue(e.target.value.toUpperCase())}
-              onKeyDown={handleScannerKeyDown}
-              placeholder={searchType === 'token' ? 'Scan or type token (PF-...)  →  Press Enter' : 'Search plate (e.g. ABC-123)'}
-              className="input-glass w-full pl-12 pr-4 py-3.5 rounded-xl text-base font-mono"
-              autoFocus
-            />
-          </div>
-          {/* Camera scan button */}
-          <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={cameraOpen ? closeCamera : openCamera}
-            disabled={cameraLoading}
-            className={`px-4 rounded-xl font-semibold flex items-center gap-2 text-sm shadow-md ${
-              cameraOpen
-                ? 'bg-rose-500 text-white hover:bg-rose-600'
-                : 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white'
-            } disabled:opacity-50`}
+          <button
+            onClick={() => { setSearchType('token'); setSearchValue(''); setTimeout(() => scannerInputRef.current?.focus(), 100); }}
+            className={`flex-1 py-2.5 rounded-xl text-sm font-semibold transition flex items-center justify-center gap-2 ${searchType === 'token' ? 'bg-gradient-to-r from-blue-500 to-purple-500 text-white shadow-md' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
           >
-            {cameraLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : cameraOpen ? <CameraOff className="w-5 h-5" /> : <Camera className="w-5 h-5" />}
-            <span className="hidden sm:inline">{cameraOpen ? 'Close' : 'Scan QR'}</span>
-          </motion.button>
+            <ScanLine className="w-4 h-4" /> Barcode Scanner
+          </button>
+          <button
+            onClick={() => { setSearchType('plate'); setSearchValue(''); setTimeout(() => scannerInputRef.current?.focus(), 100); }}
+            className={`flex-1 py-2.5 rounded-xl text-sm font-semibold transition flex items-center justify-center gap-2 ${searchType === 'plate' ? 'bg-gradient-to-r from-blue-500 to-purple-500 text-white shadow-md' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+          >
+            <Search className="w-4 h-4" /> By Plate
+          </button>
         </div>
 
-        {/* USB scanner hint */}
+        {/* Scanner status banner */}
         {searchType === 'token' && (
-          <p className="text-xs text-slate-400 mt-2 flex items-center gap-1.5">
-            <QrCode className="w-3 h-3" />
-            USB/Bluetooth scanner: token field mein auto-type hoga → Enter dabate hi checkout
-          </p>
+          <div className="flex items-center gap-3 bg-emerald-50 border border-emerald-200 rounded-2xl px-4 py-3 mb-4">
+            <div className="relative">
+              <div className="w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center">
+                <ScanLine className="w-6 h-6 text-emerald-600" />
+              </div>
+              <span className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-green-400 border-2 border-white animate-pulse" />
+            </div>
+            <div className="flex-1">
+              <p className="text-sm font-bold text-emerald-800">SC-1205 Scanner Ready</p>
+              <p className="text-xs text-emerald-600 mt-0.5">Slip ka barcode scanner kay saamne rakho → yellow button dabao → automatic checkout</p>
+            </div>
+          </div>
         )}
 
-        {/* Camera scanner */}
-        <AnimatePresence>
-          {cameraOpen && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              exit={{ opacity: 0, height: 0 }}
-              className="mt-4 overflow-hidden"
-            >
-              <div className="relative rounded-2xl overflow-hidden bg-slate-900">
-                <div id={scannerDivId} className="w-full" style={{ minHeight: 280 }} />
-                <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-                  <div className="w-52 h-52 border-2 border-white/60 rounded-2xl" />
-                </div>
-                <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-center text-xs py-2">
-                  Ticket ka QR code camera ke saamne rakho
-                </div>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+        {/* Input field */}
+        <div className="relative">
+          {searchType === 'token'
+            ? <ScanLine className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+            : <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+          }
+          <input
+            ref={scannerInputRef}
+            type="text"
+            value={searchValue}
+            onChange={(e) => setSearchValue(normalizeScanValue(e.target.value))}
+            onKeyDown={handleKeyDown}
+            placeholder={searchType === 'token' ? 'Barcode scan karo — Enter par checkout hoga...' : 'Plate number type karo (e.g. ABC-123)'}
+            className="input-glass w-full pl-12 pr-4 py-4 rounded-xl text-base font-mono tracking-wider"
+            autoComplete="off"
+            autoFocus
+          />
+        </div>
+
+        {searchType === 'token' && (
+          <p className="text-xs text-slate-400 mt-2 text-center">
+            SC-1205 supports: Code 128 · Code 39 · Code 93 · EAN · UPC
+          </p>
+        )}
       </motion.div>
 
       {/* Active sessions list */}
@@ -296,7 +264,12 @@ export default function CheckoutPage() {
             {filteredSessions.map((s, idx) => {
               const isPermanent = s.session_type === 'permanent' || !!s.shop_info;
               return (
-                <motion.div key={s.id} layout initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, scale: 0.9 }} transition={{ delay: idx * 0.03 }} whileHover={{ y: -2 }} className={`glass-strong rounded-2xl p-4 flex items-center gap-4 ${isPermanent ? 'ring-2 ring-emerald-200' : ''}`}>
+                <motion.div
+                  key={s.id} layout
+                  initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, scale: 0.9 }}
+                  transition={{ delay: idx * 0.03 }} whileHover={{ y: -2 }}
+                  className={`glass-strong rounded-2xl p-4 flex items-center gap-4 ${isPermanent ? 'ring-2 ring-emerald-200' : ''}`}
+                >
                   <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-white shadow-md flex-shrink-0 ${isPermanent ? 'bg-gradient-to-br from-emerald-500 to-teal-500' : 'bg-gradient-to-br from-blue-500 to-purple-500'}`}>
                     {isPermanent ? <Store className="w-6 h-6" /> : <Car className="w-6 h-6" />}
                   </div>
@@ -318,7 +291,11 @@ export default function CheckoutPage() {
                       <span className="font-semibold text-emerald-600">{getDuration(s.entry_time)}</span>
                     </div>
                   </div>
-                  <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={() => handleCheckout(s)} disabled={loading} className={`px-4 py-2.5 rounded-xl text-white font-semibold text-sm shadow-md disabled:opacity-50 flex items-center gap-2 ${isPermanent ? 'bg-gradient-to-r from-emerald-500 to-teal-500' : 'bg-gradient-to-r from-amber-500 to-orange-500'}`}>
+                  <motion.button
+                    whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
+                    onClick={() => handleCheckout(s)} disabled={loading}
+                    className={`px-4 py-2.5 rounded-xl text-white font-semibold text-sm shadow-md disabled:opacity-50 flex items-center gap-2 ${isPermanent ? 'bg-gradient-to-r from-emerald-500 to-teal-500' : 'bg-gradient-to-r from-amber-500 to-orange-500'}`}
+                  >
                     {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <LogOut className="w-4 h-4" />}
                     {isPermanent ? 'Allow Exit' : 'Check Out'}
                   </motion.button>

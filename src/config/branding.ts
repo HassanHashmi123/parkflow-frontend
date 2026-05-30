@@ -21,7 +21,7 @@ export const BRANDING = {
     name: "Saddar Co-Operative Market LTD.",
     shortName: "Saddar Market",
     address: "Abdullah Haroon Road Saddar Karachi 74400",
-    phone: "",
+    phone: "021-35684912",
     email: "",
     website: "",
   },
@@ -46,8 +46,8 @@ export const BRANDING = {
     showAddress: true,
     showQR: true,
     showBarcode: false,
-    footer: "Thank you for parking!\nKeep this receipt safe.",
-    width: "58mm" as "58mm" | "80mm", // Thermal printer width
+    footer: "The management is not responsible\nfor any vehicle damage or loss.",
+    width: "80mm" as "58mm" | "80mm", // Thermal printer width
     dateFormat: "DD-MM-YY", // Pakistani format
     timeFormat: "hh:mm A", // 12-hour with AM/PM
   },
