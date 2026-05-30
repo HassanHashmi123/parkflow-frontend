@@ -352,62 +352,59 @@ export default function PermanentVehiclesPage() {
   const generateBarcodesPDF = async () => {
     setGeneratingPDF(true);
     try {
-      const allVehicles = await permanentVehiclesApi.list({ limit: 2000, is_active: true });
-      if (!allVehicles || allVehicles.length === 0) {
-        toast.error('No active vehicles found');
+      // fetch without is_active filter — filter client side
+      const raw = await permanentVehiclesApi.list({ limit: 2000 });
+      const list: any[] = (Array.isArray(raw) ? raw : []).filter((v: any) => v.is_active !== false);
+
+      if (list.length === 0) {
+        toast.error('No vehicles found');
         return;
       }
 
-      const JsBarcode = (await import('jsbarcode')).default;
+      const mod = await import('jsbarcode');
+      const JsBarcode: any = (mod as any).default ?? mod;
 
-      const cards = (Array.isArray(allVehicles) ? allVehicles : []).map((v: any) => {
-        const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      const cardsHtml = list.map((v: any) => {
+        let svgHtml = '';
         try {
-          JsBarcode(svg, v.plate_number, {
-            format: 'CODE128',
-            width: 1.5,
-            height: 40,
-            displayValue: false,
-            margin: 2,
+          const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+          JsBarcode(svg, String(v.plate_number), {
+            format: 'CODE128', width: 1.5, height: 40, displayValue: false, margin: 2,
           });
-        } catch { /* skip invalid plate */ }
-        return { plate: v.plate_number, phone: v.owner_phone || '', svg: svg.outerHTML };
-      });
+          svgHtml = svg.outerHTML;
+        } catch {
+          svgHtml = `<div style="height:40px;line-height:40px;font-size:8px;color:red">ERR</div>`;
+        }
+        return `<div class="card">${svgHtml}<div class="plate">${v.plate_number}</div><div class="phone">${v.owner_phone || '—'}</div></div>`;
+      }).join('');
 
-      const win = window.open('', '_blank', 'width=1000,height=750');
-      if (!win) { toast.error('Popup blocked — please allow popups for this site'); return; }
+      const win = window.open('', '_blank');
+      if (!win) { toast.error('Popup blocked — allow popups and try again'); return; }
 
-      win.document.write(`<!DOCTYPE html><html><head>
-        <title>ParkFlow Barcodes — ${new Date().toISOString().slice(0, 10)}</title>
-        <style>
-          @page { size: A4 portrait; margin: 8mm; }
-          * { box-sizing: border-box; }
-          body { font-family: Arial, sans-serif; margin: 0; padding: 0; background: #fff; }
-          .toolbar { padding: 10px 16px; background: #4f46e5; display: flex; align-items: center; gap: 12px; }
-          .toolbar button { padding: 8px 20px; background: #fff; color: #4f46e5; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 14px; }
-          .toolbar span { color: #fff; font-size: 13px; }
-          .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4mm; padding: 2mm; }
-          .card { border: 1px solid #bbb; padding: 2mm 2mm 1mm; text-align: center; break-inside: avoid; }
-          .card svg { width: 100%; height: auto; display: block; }
-          .plate { font-weight: bold; font-size: 9pt; margin: 1.5mm 0 0.5mm; font-family: 'Courier New', monospace; letter-spacing: 1px; }
-          .phone { font-size: 7.5pt; color: #444; }
-          @media print { .toolbar { display: none; } body { padding: 0; } .grid { padding: 0; } }
-        </style>
-      </head><body>
-        <div class="toolbar">
+      win.document.write(`<!DOCTYPE html><html><head><title>Barcodes</title><style>
+        @page{size:A4 portrait;margin:8mm}*{box-sizing:border-box}
+        body{font-family:Arial,sans-serif;margin:0;background:#fff}
+        .bar{padding:10px;background:#4f46e5;display:flex;gap:12px;align-items:center}
+        .bar button{padding:8px 18px;background:#fff;color:#4f46e5;border:none;border-radius:6px;font-weight:bold;cursor:pointer;font-size:14px}
+        .bar span{color:#fff;font-size:13px}
+        .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:4mm;padding:4mm}
+        .card{border:1px solid #bbb;padding:2mm;text-align:center;break-inside:avoid}
+        .card svg{width:100%;height:auto;display:block}
+        .plate{font-weight:bold;font-size:9pt;margin:1mm 0;font-family:monospace}
+        .phone{font-size:8pt;color:#555}
+        @media print{.bar{display:none}}
+      </style></head><body>
+        <div class="bar">
           <button onclick="window.print()">🖨 Print / Save as PDF</button>
-          <span>${cards.length} barcodes · ${Math.ceil(cards.length / 28)} pages approx</span>
+          <span>${list.length} barcodes</span>
         </div>
-        <div class="grid">
-          ${cards.map(c => `<div class="card">${c.svg}<div class="plate">${c.plate}</div><div class="phone">${c.phone || '—'}</div></div>`).join('')}
-        </div>
+        <div class="grid">${cardsHtml}</div>
       </body></html>`);
       win.document.close();
-
-      toast.success(`${cards.length} barcodes ready — click "Print / Save as PDF" in the new window`);
-    } catch (err) {
-      console.error('Barcode generation error:', err);
-      toast.error('Failed to generate barcodes');
+      toast.success(`${list.length} barcodes ready — Print in new window`);
+    } catch (err: any) {
+      console.error('Barcode error:', err);
+      toast.error(err?.message ? `Error: ${err.message}` : 'Failed to generate barcodes');
     } finally {
       setGeneratingPDF(false);
     }
