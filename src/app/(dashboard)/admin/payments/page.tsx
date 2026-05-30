@@ -113,6 +113,115 @@ function ReminderSlip({ shop, onClose }: { shop: any; onClose: () => void }) {
   );
 }
 
+// ─── Payment Receipt (thermal 58mm) ──────────────────────────────────────────
+function PaymentReceipt({ payment, onClose }: { payment: any; onClose: () => void }) {
+  const slipRef = useRef<HTMLDivElement>(null);
+
+  const handlePrint = () => {
+    const content = slipRef.current;
+    if (!content) return;
+    const win = window.open('', '_blank', 'width=400,height=600');
+    if (!win) return;
+    win.document.write(`
+      <html><head><title>Payment Receipt</title>
+      <style>
+        @page { margin: 0; }
+        body { font-family: 'Courier New', monospace; font-size: 12px; margin: 0; padding: 8px; width: 58mm; }
+        .center { text-align: center; }
+        .bold { font-weight: bold; }
+        .line { border-top: 1px dashed #000; margin: 6px 0; }
+        .row { display: flex; justify-content: space-between; }
+        .big { font-size: 14px; font-weight: bold; text-align: center; }
+        .small { font-size: 10px; }
+      </style></head><body>
+      ${content.innerHTML}
+      </body></html>
+    `);
+    win.document.close();
+    win.focus();
+    win.print();
+    win.close();
+  };
+
+  const formatDate = (d: string) => d ? new Date(d).toLocaleDateString('en-PK', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
+  const paidAt = payment.paid_at
+    ? new Date(payment.paid_at).toLocaleString('en-PK', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+    : new Date().toLocaleString('en-PK', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  const monthLabel = payment.month
+    ? new Date(payment.month + '-01').toLocaleDateString('en-PK', { month: 'long', year: 'numeric' })
+    : '';
+
+  return (
+    <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-md z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <motion.div
+        initial={{ scale: 0.8, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.8, y: 20 }}
+        onClick={(e) => e.stopPropagation()}
+        className="bg-white rounded-3xl shadow-2xl max-w-sm w-full overflow-hidden"
+      >
+        <div className="bg-gradient-to-br from-emerald-500 to-teal-600 p-5 text-white flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <CreditCard className="w-5 h-5" />
+            <p className="font-bold">Payment Receipt</p>
+          </div>
+          <button onClick={onClose} className="w-7 h-7 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center"><X className="w-4 h-4" /></button>
+        </div>
+
+        <div className="p-5">
+          <div ref={slipRef} className="font-mono text-xs bg-white p-3 border border-dashed border-slate-300 rounded-xl">
+            <div className="text-center font-bold text-sm mb-1">{BRANDING.plaza.name}</div>
+            <div className="text-center text-[10px] text-slate-500 mb-1">{BRANDING.plaza.address}</div>
+            <div className="border-t border-dashed border-slate-400 my-2" />
+            <div className="text-center font-bold text-sm mb-2">✓ PAYMENT RECEIPT</div>
+            <div className="border-t border-dashed border-slate-400 my-2" />
+            <div className="flex justify-between"><span>Shop #:</span><span className="font-bold">{payment.shop_number || '—'}</span></div>
+            {payment.shop_name && <div className="flex justify-between"><span>Shop:</span><span className="font-bold">{payment.shop_name}</span></div>}
+            <div className="flex justify-between"><span>Owner:</span><span className="font-bold">{payment.owner_name || '—'}</span></div>
+            {payment.owner_phone && <div className="flex justify-between"><span>Phone:</span><span>{payment.owner_phone}</span></div>}
+            {payment.floor && <div className="flex justify-between"><span>Floor:</span><span>{payment.floor}</span></div>}
+            <div className="border-t border-dashed border-slate-400 my-2" />
+            <div className="flex justify-between"><span>Month:</span><span className="font-bold">{monthLabel}</span></div>
+            {payment.billing_start && (
+              <div className="flex justify-between">
+                <span>Billing:</span>
+                <span className="font-bold text-right">{formatDate(payment.billing_start)} – {formatDate(payment.billing_end)}</span>
+              </div>
+            )}
+            <div className="border-t border-dashed border-slate-400 my-2" />
+            <div className="flex justify-between">
+              <span className="font-bold text-sm">Amount:</span>
+              <span className="font-bold text-sm">Rs. {(payment.amount || 0).toLocaleString()}</span>
+            </div>
+            <div className="flex justify-between mt-1"><span>Method:</span><span className="font-bold uppercase">{payment.payment_method || 'Cash'}</span></div>
+            {payment.receipt_number && <div className="flex justify-between"><span>Receipt #:</span><span className="font-bold">{payment.receipt_number}</span></div>}
+            <div className="border-t border-dashed border-slate-400 my-2" />
+            <div className="flex justify-between"><span>Paid On:</span><span className="font-bold">{paidAt}</span></div>
+            <div className="border-t border-dashed border-slate-400 my-2" />
+            <div className="text-center font-bold text-sm my-1">THANK YOU</div>
+            <div className="text-center text-[10px] text-slate-500">ParkFlow Management System</div>
+          </div>
+
+          <div className="flex gap-3 mt-4">
+            <motion.button
+              whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
+              onClick={handlePrint}
+              className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-semibold text-sm flex items-center justify-center gap-2 shadow-md"
+            >
+              <Printer className="w-4 h-4" /> Print Receipt
+            </motion.button>
+            <motion.button
+              whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
+              onClick={onClose}
+              className="px-4 py-2.5 rounded-xl bg-slate-100 text-slate-600 font-semibold text-sm"
+            >
+              Close
+            </motion.button>
+          </div>
+        </div>
+      </motion.div>
+    </div>
+  );
+}
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 export default function PaymentsPage() {
   const router = useRouter();
@@ -133,6 +242,7 @@ export default function PaymentsPage() {
   const [adding, setAdding] = useState(false);
   const [search, setSearch] = useState('');
   const [slipShop, setSlipShop] = useState<any>(null);
+  const [receiptPayment, setReceiptPayment] = useState<any>(null);
 
   // Add form — billing dates default to month start/end
   const monthStart = `${currentMonth}-01`;
@@ -247,7 +357,7 @@ export default function PaymentsPage() {
     if (!form.amount || parseFloat(form.amount) <= 0) return toast.error('Enter valid amount');
     setAdding(true);
     try {
-      await monthlyPaymentsApi.create({
+      const result = await monthlyPaymentsApi.create({
         shop_id: parseInt(form.shop_id),
         month: currentMonth,
         amount: parseFloat(form.amount),
@@ -257,9 +367,18 @@ export default function PaymentsPage() {
         billing_start: form.billing_start || undefined,
         billing_end: form.billing_end || undefined,
       });
+      const shop = shops.find((s: any) => s.id === parseInt(form.shop_id));
       toast.success('Payment recorded');
       setForm({ shop_id: '', amount: '', payment_method: 'cash', receipt_number: '', notes: '', billing_start: monthStart, billing_end: monthEnd });
       setShowAdd(false);
+      setReceiptPayment({
+        ...result,
+        shop_number: shop?.shop_number,
+        shop_name: shop?.shop_name,
+        owner_name: shop?.owner_name,
+        owner_phone: shop?.owner_phone,
+        floor: shop?.floor,
+      });
       await loadData();
     } catch (err: any) { toast.error(err.response?.data?.detail || 'Failed to record'); }
     finally { setAdding(false); }
@@ -271,15 +390,24 @@ export default function PaymentsPage() {
     setAdding(true);
     try {
       const [y, m] = currentMonth.split('-').map(Number);
-      await monthlyPaymentsApi.create({
+      const billingEnd = new Date(y, m, 0).toISOString().slice(0, 10);
+      const result = await monthlyPaymentsApi.create({
         shop_id: shop.id,
         month: currentMonth,
         amount,
         payment_method: 'cash',
         billing_start: `${currentMonth}-01`,
-        billing_end: new Date(y, m, 0).toISOString().slice(0, 10),
+        billing_end: billingEnd,
       });
       toast.success(`${shop.shop_number} paid Rs. ${amount}`);
+      setReceiptPayment({
+        ...result,
+        shop_number: shop.shop_number,
+        shop_name: shop.shop_name,
+        owner_name: shop.owner_name,
+        owner_phone: shop.owner_phone,
+        floor: shop.floor,
+      });
       await loadData();
     } catch (err: any) { toast.error(err.response?.data?.detail || 'Failed'); }
     finally { setAdding(false); }
@@ -503,6 +631,9 @@ export default function PaymentsPage() {
                     <p className="text-[10px] text-slate-400 uppercase font-bold">Paid</p>
                     <p className="font-bold text-emerald-600">Rs. {p.amount.toLocaleString()}</p>
                   </div>
+                  <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={() => setReceiptPayment(p)} title="Print Receipt" className="w-9 h-9 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 flex items-center justify-center flex-shrink-0">
+                    <Printer className="w-4 h-4" />
+                  </motion.button>
                 </motion.div>
               ))}
             </AnimatePresence>
@@ -583,6 +714,11 @@ export default function PaymentsPage() {
       {/* Reminder Slip Modal */}
       <AnimatePresence>
         {slipShop && <ReminderSlip shop={slipShop} onClose={() => setSlipShop(null)} />}
+      </AnimatePresence>
+
+      {/* Payment Receipt Modal */}
+      <AnimatePresence>
+        {receiptPayment && <PaymentReceipt payment={receiptPayment} onClose={() => setReceiptPayment(null)} />}
       </AnimatePresence>
     </div>
   );
