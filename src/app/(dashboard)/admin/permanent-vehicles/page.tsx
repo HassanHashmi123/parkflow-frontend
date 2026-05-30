@@ -245,7 +245,7 @@ import { useEffect, useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   CarFront, Plus, X, Power, Sparkles, Loader2, Search,
-  Store, User, Phone, Car, Bike, Truck, Upload
+  Store, User, Phone, Car, Bike, Truck, Upload, Printer
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
@@ -272,6 +272,7 @@ export default function PermanentVehiclesPage() {
   const [actionLoading, setActionLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploadResult, setUploadResult] = useState<any>(null);
+  const [generatingPDF, setGeneratingPDF] = useState(false);
 
   // Add form
   const [form, setForm] = useState({ plate_number: '', shop_id: '', vehicle_type_id: '', owner_name: '', owner_phone: '', notes: '' });
@@ -348,6 +349,79 @@ export default function PermanentVehiclesPage() {
     finally { setUploading(false); if (fileRef.current) fileRef.current.value = ''; }
   };
 
+  const generateBarcodesPDF = async () => {
+    setGeneratingPDF(true);
+    try {
+      const allVehicles = await permanentVehiclesApi.list({ limit: 2000, is_active: true });
+      if (!allVehicles || allVehicles.length === 0) {
+        toast.error('No active vehicles found');
+        return;
+      }
+
+      const { jsPDF } = await import('jspdf');
+      const JsBarcode = (await import('jsbarcode')).default;
+
+      const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+
+      const pageW = 210, pageH = 297;
+      const marginX = 10, marginY = 10;
+      const cols = 4, gap = 5;
+      const cardW = (pageW - 2 * marginX - (cols - 1) * gap) / cols;
+      const cardH = 32, rowGap = 4;
+      const rows = Math.floor((pageH - 2 * marginY) / (cardH + rowGap));
+      const perPage = cols * rows;
+
+      for (let i = 0; i < allVehicles.length; i++) {
+        const v = allVehicles[i];
+        const posInPage = i % perPage;
+
+        if (posInPage === 0 && i > 0) doc.addPage();
+
+        const col = posInPage % cols;
+        const row = Math.floor(posInPage / cols);
+        const x = marginX + col * (cardW + gap);
+        const y = marginY + row * (cardH + rowGap);
+
+        doc.setDrawColor(200, 200, 200);
+        doc.setLineWidth(0.3);
+        doc.roundedRect(x, y, cardW, cardH, 2, 2);
+
+        const canvas = document.createElement('canvas');
+        try {
+          JsBarcode(canvas, v.plate_number, {
+            format: 'CODE128',
+            width: 2,
+            height: 50,
+            displayValue: false,
+            margin: 2,
+          });
+          doc.addImage(canvas.toDataURL('image/png'), 'PNG', x + 2, y + 2, cardW - 4, 16);
+        } catch {
+          doc.setFontSize(6);
+          doc.text('BARCODE ERROR', x + cardW / 2, y + 10, { align: 'center' });
+        }
+
+        doc.setFontSize(8);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(20, 20, 20);
+        doc.text(v.plate_number, x + cardW / 2, y + 22, { align: 'center' });
+
+        doc.setFontSize(7);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(80, 80, 80);
+        doc.text(v.owner_phone || '—', x + cardW / 2, y + 28, { align: 'center' });
+      }
+
+      doc.save(`parkflow-barcodes-${new Date().toISOString().slice(0, 10)}.pdf`);
+      toast.success(`PDF ready — ${allVehicles.length} barcodes on ${Math.ceil(allVehicles.length / perPage)} pages`);
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to generate PDF');
+    } finally {
+      setGeneratingPDF(false);
+    }
+  };
+
   const handleDeactivate = async () => {
     if (!confirmDeactivate) return;
     setActionLoading(true);
@@ -380,6 +454,10 @@ export default function PermanentVehiclesPage() {
             <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={() => fileRef.current?.click()} disabled={uploading} className="glass px-4 py-3 rounded-2xl text-slate-700 font-semibold flex items-center gap-2 hover:bg-white disabled:opacity-50">
               {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
               CSV Upload
+            </motion.button>
+            <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={generateBarcodesPDF} disabled={generatingPDF || vehicles.length === 0} className="glass px-4 py-3 rounded-2xl text-emerald-700 font-semibold flex items-center gap-2 hover:bg-white disabled:opacity-50">
+              {generatingPDF ? <Loader2 className="w-4 h-4 animate-spin" /> : <Printer className="w-4 h-4" />}
+              {generatingPDF ? 'Generating...' : 'Print Barcodes'}
             </motion.button>
             <motion.button whileHover={{ scale: 1.05, y: -2 }} whileTap={{ scale: 0.95 }} onClick={() => setShowAdd(true)} className="btn-gradient px-5 py-3 rounded-2xl text-white font-semibold flex items-center gap-2 shadow-lg">
               <Plus className="w-5 h-5" /> Register Vehicle
