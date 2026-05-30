@@ -358,65 +358,56 @@ export default function PermanentVehiclesPage() {
         return;
       }
 
-      const jsPDF = (await import('jspdf')).default;
       const JsBarcode = (await import('jsbarcode')).default;
 
-      const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-
-      const pageW = 210, pageH = 297;
-      const marginX = 10, marginY = 10;
-      const cols = 4, gap = 5;
-      const cardW = (pageW - 2 * marginX - (cols - 1) * gap) / cols;
-      const cardH = 32, rowGap = 4;
-      const rows = Math.floor((pageH - 2 * marginY) / (cardH + rowGap));
-      const perPage = cols * rows;
-
-      for (let i = 0; i < allVehicles.length; i++) {
-        const v = allVehicles[i];
-        const posInPage = i % perPage;
-
-        if (posInPage === 0 && i > 0) doc.addPage();
-
-        const col = posInPage % cols;
-        const row = Math.floor(posInPage / cols);
-        const x = marginX + col * (cardW + gap);
-        const y = marginY + row * (cardH + rowGap);
-
-        doc.setDrawColor(200, 200, 200);
-        doc.setLineWidth(0.3);
-        doc.rect(x, y, cardW, cardH);
-
-        const canvas = document.createElement('canvas');
+      const cards = (Array.isArray(allVehicles) ? allVehicles : []).map((v: any) => {
+        const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
         try {
-          JsBarcode(canvas, v.plate_number, {
+          JsBarcode(svg, v.plate_number, {
             format: 'CODE128',
-            width: 2,
-            height: 50,
+            width: 1.5,
+            height: 40,
             displayValue: false,
             margin: 2,
           });
-          doc.addImage(canvas.toDataURL('image/png'), 'PNG', x + 2, y + 2, cardW - 4, 16);
-        } catch {
-          doc.setFontSize(6);
-          doc.text('BARCODE ERROR', x + cardW / 2, y + 10, { align: 'center' });
-        }
+        } catch { /* skip invalid plate */ }
+        return { plate: v.plate_number, phone: v.owner_phone || '', svg: svg.outerHTML };
+      });
 
-        doc.setFontSize(8);
-        doc.setFont('helvetica', 'bold');
-        doc.setTextColor(20, 20, 20);
-        doc.text(v.plate_number, x + cardW / 2, y + 22, { align: 'center' });
+      const win = window.open('', '_blank', 'width=1000,height=750');
+      if (!win) { toast.error('Popup blocked — please allow popups for this site'); return; }
 
-        doc.setFontSize(7);
-        doc.setFont('helvetica', 'normal');
-        doc.setTextColor(80, 80, 80);
-        doc.text(v.owner_phone || '—', x + cardW / 2, y + 28, { align: 'center' });
-      }
+      win.document.write(`<!DOCTYPE html><html><head>
+        <title>ParkFlow Barcodes — ${new Date().toISOString().slice(0, 10)}</title>
+        <style>
+          @page { size: A4 portrait; margin: 8mm; }
+          * { box-sizing: border-box; }
+          body { font-family: Arial, sans-serif; margin: 0; padding: 0; background: #fff; }
+          .toolbar { padding: 10px 16px; background: #4f46e5; display: flex; align-items: center; gap: 12px; }
+          .toolbar button { padding: 8px 20px; background: #fff; color: #4f46e5; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 14px; }
+          .toolbar span { color: #fff; font-size: 13px; }
+          .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4mm; padding: 2mm; }
+          .card { border: 1px solid #bbb; padding: 2mm 2mm 1mm; text-align: center; break-inside: avoid; }
+          .card svg { width: 100%; height: auto; display: block; }
+          .plate { font-weight: bold; font-size: 9pt; margin: 1.5mm 0 0.5mm; font-family: 'Courier New', monospace; letter-spacing: 1px; }
+          .phone { font-size: 7.5pt; color: #444; }
+          @media print { .toolbar { display: none; } body { padding: 0; } .grid { padding: 0; } }
+        </style>
+      </head><body>
+        <div class="toolbar">
+          <button onclick="window.print()">🖨 Print / Save as PDF</button>
+          <span>${cards.length} barcodes · ${Math.ceil(cards.length / 28)} pages approx</span>
+        </div>
+        <div class="grid">
+          ${cards.map(c => `<div class="card">${c.svg}<div class="plate">${c.plate}</div><div class="phone">${c.phone || '—'}</div></div>`).join('')}
+        </div>
+      </body></html>`);
+      win.document.close();
 
-      doc.save(`parkflow-barcodes-${new Date().toISOString().slice(0, 10)}.pdf`);
-      toast.success(`PDF ready — ${allVehicles.length} barcodes on ${Math.ceil(allVehicles.length / perPage)} pages`);
+      toast.success(`${cards.length} barcodes ready — click "Print / Save as PDF" in the new window`);
     } catch (err) {
-      console.error(err);
-      toast.error('Failed to generate PDF');
+      console.error('Barcode generation error:', err);
+      toast.error('Failed to generate barcodes');
     } finally {
       setGeneratingPDF(false);
     }
