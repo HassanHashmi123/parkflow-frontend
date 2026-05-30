@@ -376,9 +376,12 @@ export default function PermanentVehiclesPage() {
         let svgHtml = '';
         try {
           const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+          const phone = v.owner_phone ? String(v.owner_phone) : null;
           JsBarcode(svg, String(v.plate_number), {
             format: 'CODE128', width: 1.2, height: 40,
-            displayValue: true, text: v.owner_phone || '', fontSize: 11, margin: 2,
+            displayValue: !!phone,
+            ...(phone ? { text: phone } : {}),
+            fontSize: 11, margin: 2,
           });
           svgHtml = svg.outerHTML;
         } catch {
