@@ -358,7 +358,7 @@ export default function PermanentVehiclesPage() {
         return;
       }
 
-      const { jsPDF } = await import('jspdf');
+      const jsPDF = (await import('jspdf')).default;
       const JsBarcode = (await import('jsbarcode')).default;
 
       const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
@@ -384,7 +384,7 @@ export default function PermanentVehiclesPage() {
 
         doc.setDrawColor(200, 200, 200);
         doc.setLineWidth(0.3);
-        doc.roundedRect(x, y, cardW, cardH, 2, 2);
+        doc.rect(x, y, cardW, cardH);
 
         const canvas = document.createElement('canvas');
         try {
